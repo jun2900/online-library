@@ -4,5 +4,6 @@ import "gorm.io/gorm"
 
 type Faculty struct {
 	gorm.Model
-	Name string `json:"name" gorm:"size:15"`
+	Name   string `json:"name" gorm:"size:15"`
+	Papers []Paper
 }

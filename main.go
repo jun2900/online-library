@@ -10,17 +10,20 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+
+	"github.com/jun2900/online-library/database"
+	"github.com/jun2900/online-library/routes"
 )
 
 func initDatabase() {
+	var err error
 	dsn := os.Getenv("DSN")
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	database.DBConn, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")
 	}
-	sqlDB, _ := db.DB()
-	sqlDB.SetMaxIdleConns(10)
 	fmt.Println("connection open")
+	//database.DBConn.AutoMigrate(&models.User{}, &models.Paper{}, &models.Author{}, &models.Faculty{})
 }
 
 func main() {
@@ -37,6 +40,8 @@ func main() {
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendString("Hello, World!")
 	})
+
+	routes.AuthRoutes(app)
 
 	port := os.Getenv("PORT")
 	app.Listen(port)
