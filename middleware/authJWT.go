@@ -30,6 +30,6 @@ func VerifyToken(c *fiber.Ctx) error {
 	}
 
 	claims := token.Claims.(jwt.MapClaims)
-	c.Locals("email", claims["email"])
+	c.Locals("userId", claims["user_id"])
 	return c.Next()
 }

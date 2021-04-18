@@ -44,7 +44,6 @@ func Login(c *fiber.Ctx) error {
 
 	db := database.DBConn
 	user := new(models.User)
-
 	if err := c.BodyParser(&input); err != nil {
 		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Review your input", "data": err})
 	}
@@ -63,7 +62,7 @@ func Login(c *fiber.Ctx) error {
 	token := jwt.New(jwt.SigningMethodHS256)
 
 	claims := token.Claims.(jwt.MapClaims)
-	claims["email"] = user.Email
+	claims["user_id"] = user.ID
 	claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
 
 	t, err := token.SignedString([]byte(os.Getenv("ACCESS_TOKEN_SECRET")))
