@@ -41,7 +41,9 @@ func main() {
 		return c.SendString("Hello, World!")
 	})
 
+	//Main routes
 	routes.AuthRoutes(app)
+	routes.PaperRoutes(app)
 
 	port := os.Getenv("PORT")
 	app.Listen(port)
