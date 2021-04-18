@@ -42,6 +42,7 @@ func main() {
 	})
 
 	routes.AuthRoutes(app)
+	routes.PaperRoutes(app)
 
 	port := os.Getenv("PORT")
 	app.Listen(port)

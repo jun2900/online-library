@@ -29,7 +29,5 @@ func VerifyToken(c *fiber.Ctx) error {
 		c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": "error", "message": "Token is not valid"})
 	}
 
-	claims := token.Claims.(jwt.MapClaims)
-	c.Locals("userId", claims["user_id"])
 	return c.Next()
 }

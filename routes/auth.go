@@ -7,6 +7,6 @@ import (
 )
 
 func AuthRoutes(app *fiber.App) {
-	app.Post("/signup", middleware.VerifyToken, controllers.Signup)
-	app.Get("/login", controllers.Login)
+	app.Post("/signup", middleware.VerifyToken, middleware.CheckEmailExisted, controllers.Signup)
+	app.Post("/login", controllers.Login)
 }
