@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +15,15 @@ import (
 	"gorm.io/gorm"
 )
 
+const uploadPath = "./uploads"
+
+func handlingRowError(err error, c *fiber.Ctx) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "messsage": "Paper not found"})
+	}
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Error handling query", "err": err})
+}
+
 func ReadAllPaper(c *fiber.Ctx) error {
 	db := database.DBConn
 	var papers []models.Paper
@@ -19,8 +31,20 @@ func ReadAllPaper(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "Papers": papers})
 }
 
+func ReadSpecificPaper(c *fiber.Ctx) error {
+	db := database.DBConn
+
+	paperId := c.Locals("id")
+
+	var paper models.Paper
+	if err := db.First(&paper, paperId).Error; err != nil {
+		return handlingRowError(err, c)
+	}
+
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "paper": paper})
+}
+
 func CreatePaper(c *fiber.Ctx) error {
-	const uploadPath = "./uploads"
 	db := database.DBConn
 	paper := new(models.Paper)
 
@@ -52,20 +76,50 @@ func CreatePaper(c *fiber.Ctx) error {
 }
 
 func DownloadPaper(c *fiber.Ctx) error {
-	paperId, err := c.ParamsInt("id")
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Error processing param id", "err": err})
-	}
+	paperId := c.Locals("id")
 
 	db := database.DBConn
 	paper := new(models.Paper)
 
-	if err := db.Select("content").First(&paper, paperId).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "messsage": "Paper not found"})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Error handling query", "err": err})
+	if err := db.Select("title").First(&paper, paperId).Error; err != nil {
+		return handlingRowError(err, c)
 	}
 
-	return c.SendString("Hello")
+	return c.Download(fmt.Sprintf("./uploads/%d-%s.pdf", paperId, paper.Title))
+}
+
+func UpdatePaper(c *fiber.Ctx) error {
+	db := database.DBConn
+	input := new(models.Paper)
+	paperId := c.Locals("id")
+	paper := new(models.Paper)
+
+	if err := c.BodyParser(input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": "review your input"})
+	}
+
+	if err := db.First(&paper, paperId).Error; err != nil {
+		return handlingRowError(err, c)
+	}
+
+	if input.Title != paper.Title {
+		os.Rename(fmt.Sprintf("./uploads/%d-%s.pdf", paper.ID, paper.Title), fmt.Sprintf("./uploads/%d-%s.pdf", paper.ID, input.Title))
+		paper.Title = input.Title
+	}
+
+	if bytes.Compare(input.Content, paper.Content) != 0 {
+		err := ioutil.WriteFile(fmt.Sprintf("./uploads/%d-%s.pdf", paper.ID, paper.Title), input.Content, 0666)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "error reading the file content", "error": err})
+		}
+		paper.Content = input.Content
+	}
+	paper.Abstract = input.Abstract
+	paper.FacultyID = input.FacultyID
+
+	db.Model(&paper).Association("Authors").Replace(input.Authors)
+
+	db.Session(&gorm.Session{FullSaveAssociations: true}).Save(&paper)
+
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "Success", "message": "paper updated"})
 }
