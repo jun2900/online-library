@@ -12,4 +12,5 @@ func PaperRoutes(app *fiber.App) {
 	app.Get("/download/paper/:id", middleware.VerifyToken, middleware.VerifyParamIdPaper, controllers.DownloadPaper)
 	app.Get("paper/:id", middleware.VerifyParamIdPaper, controllers.ReadSpecificPaper)
 	app.Put("/paper/:id", middleware.VerifyToken, middleware.VerifyParamIdPaper, controllers.UpdatePaper)
+	app.Delete("/paper/:id", middleware.VerifyToken, middleware.VerifyParamIdPaper, controllers.DeletePaper)
 }

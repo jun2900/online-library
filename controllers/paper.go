@@ -24,6 +24,10 @@ func handlingRowError(err error, c *fiber.Ctx) error {
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Error handling query", "err": err})
 }
 
+func validatePaperStruct(input models.Paper) []*ErrorResponse {
+	return HandlingInput(input)
+}
+
 func ReadAllPaper(c *fiber.Ctx) error {
 	db := database.DBConn
 	var papers []models.Paper
@@ -46,32 +50,41 @@ func ReadSpecificPaper(c *fiber.Ctx) error {
 
 func CreatePaper(c *fiber.Ctx) error {
 	db := database.DBConn
-	paper := new(models.Paper)
+	input := new(models.Paper)
 
-	if err := c.BodyParser(paper); err != nil {
+	if err := c.BodyParser(input); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": "review your input"})
 	}
 
-	fileType := http.DetectContentType(paper.Content)
+	if err := db.Where(&models.Paper{Title: input.Title}).First(&input).Error; err == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": fmt.Sprintf("paper with the title %s already exist", input.Title)})
+	}
+
+	inputErrors := HandlingInput(input)
+	if inputErrors != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "err": inputErrors})
+	}
+
+	fileType := http.DetectContentType(input.Content)
 	if fileType != "application/pdf" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": "filetype must be application/pdf"})
 	}
 
-	f, err := os.Create(filepath.Join(uploadPath, paper.Title+".pdf"))
+	f, err := os.Create(filepath.Join(uploadPath, input.Title+".pdf"))
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Error in proccessing file upload", "err": err})
 	}
 	defer f.Close()
 
-	if _, err := f.Write(paper.Content); err != nil {
+	if _, err := f.Write(input.Content); err != nil {
 		panic(err)
 	}
 	if err := f.Sync(); err != nil {
 		panic(err)
 	}
 
-	db.Create(&paper)
-	db.Save(&paper)
+	db.Create(&input)
+	db.Save(&input)
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "message": "paper created"})
 }
 
@@ -98,6 +111,11 @@ func UpdatePaper(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": "review your input"})
 	}
 
+	inputErrors := HandlingInput(input)
+	if inputErrors != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "err": inputErrors})
+	}
+
 	if err := db.First(&paper, paperId).Error; err != nil {
 		return handlingRowError(err, c)
 	}
@@ -116,10 +134,23 @@ func UpdatePaper(c *fiber.Ctx) error {
 	}
 	paper.Abstract = input.Abstract
 	paper.FacultyID = input.FacultyID
+	//paper.Authors = input.Authors
 
 	db.Model(&paper).Association("Authors").Replace(input.Authors)
 
 	db.Session(&gorm.Session{FullSaveAssociations: true}).Save(&paper)
 
-	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "Success", "message": "paper updated"})
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "message": "paper updated"})
+}
+
+func DeletePaper(c *fiber.Ctx) error {
+	paperId := c.Locals("id")
+	db := database.DBConn
+	paper := new(models.Paper)
+
+	if err := db.Delete(&paper, paperId).Error; err != nil {
+		handlingRowError(err, c)
+	}
+
+	return c.JSON(fiber.Map{"status": "success", "message": "Paper deleted"})
 }

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -15,12 +16,26 @@ import (
 	"gorm.io/gorm"
 )
 
+func validateUserStruct(input models.User) []*ErrorResponse {
+	return HandlingInput(input)
+}
+
 func Signup(c *fiber.Ctx) error {
 	db := database.DBConn
 	user := new(models.User)
 	if err := c.BodyParser(user); err != nil {
 		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Review your input", "data": err})
 	}
+
+	inputErrors := validateUserStruct(*user)
+	if inputErrors != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "err": inputErrors})
+	}
+
+	if err := db.Where(&models.User{Email: user.Email}).First(&user).Error; err == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": fmt.Sprintf("user with the email %s already exist", user.Email)})
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Couldn't hash password", "data": err})
@@ -36,17 +51,18 @@ func Login(c *fiber.Ctx) error {
 		log.Fatal("Error loading .env file")
 	}
 
-	type InputLogin struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	var input InputLogin
-
 	db := database.DBConn
 	user := new(models.User)
-	if err := c.BodyParser(&input); err != nil {
+	input := new(models.User)
+	if err := c.BodyParser(input); err != nil {
 		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Review your input", "data": err})
 	}
+
+	inputErrors := validateUserStruct(*input)
+	if inputErrors != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "err": inputErrors})
+	}
+
 	if err := db.Where(&models.User{Email: input.Email}).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": "error", "message": "User not found"})
