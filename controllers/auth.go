@@ -16,10 +16,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func validateUserStruct(input models.User) []*ErrorResponse {
-	return HandlingInput(input)
-}
-
 func Signup(c *fiber.Ctx) error {
 	db := database.DBConn
 	user := new(models.User)
@@ -27,7 +23,7 @@ func Signup(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Review your input", "data": err})
 	}
 
-	inputErrors := validateUserStruct(*user)
+	inputErrors := HandlingInput(*user)
 	if inputErrors != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "err": inputErrors})
 	}
@@ -42,7 +38,7 @@ func Signup(c *fiber.Ctx) error {
 	}
 	user.Password = string(hashedPassword)
 	db.Create(&user)
-	return c.JSON(fiber.Map{"status": "success", "message": "Created user", "data": user})
+	return c.JSON(fiber.Map{"status": "success", "message": "user created"})
 }
 
 func Login(c *fiber.Ctx) error {
@@ -58,7 +54,7 @@ func Login(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"status": "error", "message": "Review your input", "data": err})
 	}
 
-	inputErrors := validateUserStruct(*input)
+	inputErrors := HandlingInput(*input)
 	if inputErrors != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "err": inputErrors})
 	}
