@@ -49,6 +49,7 @@ func ReadSpecificPaper(c *fiber.Ctx) error {
 	if err := db.First(&paper, paperId).Error; err != nil {
 		return handlingRowError(err, c)
 	}
+	db.Preload("Authors").Find(&paper)
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "paper": paper})
 }

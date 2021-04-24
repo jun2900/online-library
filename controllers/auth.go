@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -83,4 +84,15 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"status": "success", "message": "Token successfully created", "data": t})
+}
+
+func Logout(c *fiber.Ctx) error {
+	var ctx = context.Background()
+	token := c.Get("x-access-token")
+
+	rdb := database.Rdb
+	if err := rdb.SAdd(ctx, "blacklist_token", token).Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "err": err})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "success", "message": "you are logged out"})
 }

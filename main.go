@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 
 	"gorm.io/driver/mysql"
@@ -15,7 +16,7 @@ import (
 	"github.com/jun2900/online-library/routes"
 )
 
-func initDatabase() {
+func initMainDatabase() {
 	var err error
 	dsn := os.Getenv("DSN")
 	database.DBConn, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
@@ -29,14 +30,17 @@ func initDatabase() {
 func main() {
 	app := fiber.New()
 
+	//Using Cors
+	app.Use(cors.New())
+
 	//Load env file
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	initDatabase()
-
+	//Connect to database
+	initMainDatabase()
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendString("Hello, World!")
 	})
