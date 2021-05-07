@@ -7,6 +7,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jun2900/online-library/database"
+	"github.com/jun2900/online-library/models"
 )
 
 func VerifyToken(c *fiber.Ctx) error {
@@ -34,9 +35,23 @@ func VerifyToken(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": "error", "message": "Token expired"})
 	}
 
-	if _, err := token.Claims.(jwt.Claims); err && !token.Valid {
-		c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": "error", "message": "Token is not valid"})
+	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": "error", "message": "Token is not valid"})
 	}
 
+	roleId, _ := token.Claims.(jwt.MapClaims)["role_id"]
+	c.Locals("roleId", roleId)
+
+	return c.Next()
+}
+
+func IsAdmin(c *fiber.Ctx) error {
+	db := database.DBConn
+	role := new(models.Role)
+
+	db.First(&role, c.Locals("roleId"))
+	if role.Name != "admin" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": "user is not an admin"})
+	}
 	return c.Next()
 }

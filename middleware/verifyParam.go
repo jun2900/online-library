@@ -7,6 +7,6 @@ func VerifyParamIdPaper(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Error processing param id", "err": err})
 	}
-	c.Locals("id", paperId)
+	c.Locals("paperId", paperId)
 	return c.Next()
 }

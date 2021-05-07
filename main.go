@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jun2900/online-library/database"
+	"github.com/jun2900/online-library/models"
 	"github.com/jun2900/online-library/routes"
 )
 
@@ -24,7 +25,7 @@ func initMainDatabase() {
 		panic("failed to connect database")
 	}
 	fmt.Println("connection open")
-	//database.DBConn.AutoMigrate(&models.User{}, &models.Paper{}, &models.Author{}, &models.Faculty{})
+	database.DBConn.AutoMigrate(&models.Role{}, &models.User{}, &models.Faculty{}, &models.Author{}, &models.Paper{})
 }
 
 func main() {

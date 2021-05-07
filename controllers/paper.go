@@ -18,11 +18,11 @@ import (
 const uploadPath = "./uploads"
 
 type inputPaper struct {
-	Title     string   `json:"title"`
-	Abstract  string   `json:"abstract"`
-	Content   []byte   `json:"content"`
-	FacultyID uint     `json:"facultyId"`
-	Authors   []string `json:"authors"`
+	Title     string   `json:"title" validate:"required"`
+	Abstract  string   `json:"abstract" validate:"required"`
+	Content   []byte   `json:"content" validate:"required"`
+	FacultyID uint     `json:"facultyId" validate:"required"`
+	Authors   []string `json:"authors" validate:"required"`
 }
 
 func handlingRowError(err error, c *fiber.Ctx) error {
@@ -40,10 +40,17 @@ func ReadAllPaper(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "Papers": papers})
 }
 
+func ReadAllAcceptedPaper(c *fiber.Ctx) error {
+	db := database.DBConn
+	var papers []models.Paper
+	db.Where("status = ?", "accepted").Preload("Authors").Find(&papers)
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "Papers": papers})
+}
+
 func ReadSpecificPaper(c *fiber.Ctx) error {
 	db := database.DBConn
 
-	paperId := c.Locals("id")
+	paperId := c.Locals("paperId")
 
 	var paper models.Paper
 	if err := db.First(&paper, paperId).Error; err != nil {
@@ -70,13 +77,13 @@ func CreatePaperPost(c *fiber.Ctx) error {
 	db := database.DBConn
 	input := new(inputPaper)
 
+	if err := c.BodyParser(input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": "review your input"})
+	}
+
 	inputErrors := HandlingInput(input)
 	if inputErrors != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "err": inputErrors})
-	}
-
-	if err := c.BodyParser(input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "error", "message": "review your input"})
 	}
 
 	if err := db.Where(&models.Paper{Title: input.Title}).First(&models.Paper{}).Error; err == nil {
@@ -115,7 +122,7 @@ func CreatePaperPost(c *fiber.Ctx) error {
 }
 
 func DownloadPaper(c *fiber.Ctx) error {
-	paperId := c.Locals("id")
+	paperId := c.Locals("paperId")
 
 	db := database.DBConn
 	paper := new(models.Paper)
@@ -131,7 +138,7 @@ func DownloadPaper(c *fiber.Ctx) error {
 func UpdatePaperPut(c *fiber.Ctx) error {
 	db := database.DBConn
 	input := new(inputPaper)
-	paperId := c.Locals("id")
+	paperId := c.Locals("paperId")
 	paper := new(models.Paper)
 
 	if err := c.BodyParser(input); err != nil {
@@ -172,8 +179,19 @@ func UpdatePaperPut(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "message": "paper updated"})
 }
 
+func UpdatePaperStatus(c *fiber.Ctx) error {
+	paperId := c.Locals("paperId")
+	db := database.DBConn
+
+	if err := db.First(&models.Paper{}, paperId).Update("status", c.Query("status")).Error; err != nil {
+		return handlingRowError(err, c)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "success", "message": "paper updated"})
+}
+
 func DeletePaper(c *fiber.Ctx) error {
-	paperId := c.Locals("id")
+	paperId := c.Locals("paperId")
 	db := database.DBConn
 	paper := new(models.Paper)
 

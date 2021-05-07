@@ -1,3 +1,5 @@
 .env
 script/
 uploads/
+.dockerignore
+.docker-compose-bak.yml
