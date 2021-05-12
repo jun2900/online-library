@@ -19,7 +19,11 @@ import (
 
 func initMainDatabase() {
 	var err error
-	dsn := os.Getenv("DSN")
+	mysqlUser := os.Getenv("MYSQL_USER")
+	mysqlPassword := os.Getenv("MYSQL_PASSWORD")
+	mysqlPort := os.Getenv("MYSQL_PORT")
+	mysqlDatabase := os.Getenv("MYSQL_DATABASE")
+	dsn := fmt.Sprintf("%s:%s@tcp(localhost:%s)/%s?charset=utf8&parseTime=True&loc=Local", mysqlUser, mysqlPassword, mysqlPort, mysqlDatabase)
 	database.DBConn, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")

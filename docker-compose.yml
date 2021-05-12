@@ -1,0 +1,45 @@
+version: '3.7'
+services:
+  fullstack-mysql:
+    image: mysql
+    container_name: db_mysql
+    environment:
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - database_mysql:/var/lib/mysql
+    network_mode: host
+
+  fullstack-redis:
+    image: redis:alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    container_name: db_redis
+    network_mode: host
+    volumes:
+      - database_redis:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_container
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: phpmyadmin_container
+    depends_on:
+      - fullstack-mysql
+    environment:
+      - PMA_ARBITRARY=1
+    restart: always
+    network_mode: host
+
+volumes:
+  database_mysql:
+  database_redis:

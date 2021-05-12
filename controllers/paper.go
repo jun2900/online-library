@@ -2,16 +2,18 @@ package controllers
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
+	"sync"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jun2900/online-library/database"
 	"github.com/jun2900/online-library/models"
+	"github.com/streadway/amqp"
 	"gorm.io/gorm"
 )
 
@@ -67,8 +69,19 @@ func CreatePaperGet(c *fiber.Ctx) error {
 	var authors []models.Author
 	var faculties []models.Faculty
 
-	db.Find(&authors)
-	db.Find(&faculties)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		db.Find(&authors)
+		wg.Done()
+	}()
+	go func() {
+		db.Find(&faculties)
+		wg.Done()
+	}()
+
+	wg.Wait()
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"authors": authors, "faculty": faculties})
 }
 
@@ -105,18 +118,41 @@ func CreatePaperPost(c *fiber.Ctx) error {
 	paper := &models.Paper{Title: input.Title, Abstract: input.Abstract, Content: input.Content, FacultyID: input.FacultyID, Authors: authors}
 	db.Session(&gorm.Session{FullSaveAssociations: true}).Create(&paper)
 
-	f, err := os.Create(filepath.Join(uploadPath, fmt.Sprintf("%d-%s.pdf", paper.ID, paper.Title)))
+	//RabbitMq connection
+	conn, err := amqp.Dial(database.RabbitMqUrl)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Error in proccessing file upload", "err": err})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Failed to connect to RabbitMQ"})
 	}
-	defer f.Close()
+	defer conn.Close()
 
-	if _, err := f.Write(input.Content); err != nil {
-		panic(err)
+	ch, err := conn.Channel()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Failed to open a channel"})
 	}
-	if err := f.Sync(); err != nil {
-		panic(err)
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		"insert_paper_content", // name
+		false,                  // durable
+		false,                  // delete when unused
+		false,                  // exclusive
+		false,                  // no-wait
+		nil,                    // arguments
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Failed to open a channel"})
 	}
+
+	body, _ := json.Marshal(paper)
+	err = ch.Publish(
+		"",     // exchange
+		q.Name, // routing key
+		false,  // mandatory
+		false,  // immediate
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        body,
+		})
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "success", "message": "paper created"})
 }
